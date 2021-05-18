@@ -11,6 +11,7 @@ if argc == 0:
     print( 'No input file' )
     sys.exit( 1 )
 imb_outfile = sys.argv[1]
+fbase = os.path.splitext( os.path.basename( imb_outfile ) )[0] + '-'
 if argc > 2:
     comment = ' ' + sys.argv[2]
 else:
@@ -63,7 +64,7 @@ def ping( f, bench, np ):
             break;
         df.loc[ int(tokens[0]) ] = [ float(tokens[2]), float(tokens[3]) ]
 
-    df.to_csv( bench+'.csv', sep=',' )
+    df.to_csv( fbase+bench+'.csv', sep=',' )
 
     plt.loglog()
     fig, ax0 = plt.subplots(1,1)
@@ -79,7 +80,7 @@ def ping( f, bench, np ):
     h1, l1 = ax1.get_legend_handles_labels()
     ax1.legend( h0+h1, l0+l1, loc='lower right' )
     plt.title( bench + comment )
-    plt.savefig( bench+'.pdf' )
+    plt.savefig( fbase+bench+'.pdf' )
     plt.close('all')
 
     nb = get_benchmark( f )
@@ -102,20 +103,20 @@ def exchange( f, bench, np ):
         if nb != bench:
             break
 
-    df_lat.to_csv( bench+'-latency.csv',   sep=',' )
-    df_bdw.to_csv( bench+'-bandwidth.csv', sep=',' )
+    df_lat.to_csv( fbase+bench+'-latency.csv',   sep=',' )
+    df_bdw.to_csv( fbase+bench+'-bandwidth.csv', sep=',' )
 
     ax = df_lat.plot( title=bench+' (latency)'+comment,
                       loglog=True, grid=True, legend='reverse' )
     ax.set_xlabel( 'Length (bytes)' )
     ax.set_ylabel( 'Latency (usec)' )
-    plt.savefig( bench+'-latency.pdf' )
+    plt.savefig( fbase+bench+'-latency.pdf' )
     plt.close('all')
     ax = df_bdw.plot( title=bench+' (bandwidth)'+comment,
                       loglog=True, grid=True, legend='reverse' )
     ax.set_xlabel( 'Length (bytes)' )
     ax.set_ylabel( 'Bandwidth (Mbytes/sec)' )
-    plt.savefig( bench+'-bandwidth.pdf' )
+    plt.savefig( fbase+bench+'-bandwidth.pdf' )
     plt.close('all')
 
     return ( nb, np )
@@ -134,13 +135,13 @@ def collective( f, bench, np ):
         if nb != bench:
             break
 
-    df.to_csv( bench+'.csv', sep=',' )
+    df.to_csv( fbase+bench+'.csv', sep=',' )
 
     ax = df.plot( title=bench+comment,
                   loglog=True, grid=True, legend='reverse' )
     ax.set_xlabel( 'Length (bytes)' )
     ax.set_ylabel( 'Latency (usec)' )
-    plt.savefig( bench+'.pdf' )
+    plt.savefig( fbase+bench+'.pdf' )
     plt.close('all')
 
     return ( nb, np )
@@ -158,14 +159,14 @@ def barrier( f, bench, np ):
         if nb != bench:
             break
 
-    df.to_csv( bench+'.csv', sep=',' )
+    df.to_csv( fbase+bench+'.csv', sep=',' )
     
     ax = df.plot( title=bench+comment,
                   grid=True, marker='*', ylim=(0,None), legend=None )
     ax.set_xscale( 'log' )
     ax.set_xlabel( '# procs' )
     ax.set_ylabel( 'Latency (usec)' )
-    plt.savefig( bench+'.pdf' )
+    plt.savefig( fbase+bench+'.pdf' )
     plt.close('all')
 
     return ( nb, np )
