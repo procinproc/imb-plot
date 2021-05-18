@@ -16,7 +16,7 @@ created so that users can create neat graphs easily.
 
 # Limitation
 
-Currently only IMB-MPI1 output can handle.
+Currently only IMB-MPI1 output can be handled.
 
 # Author
 
