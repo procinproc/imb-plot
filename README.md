@@ -20,5 +20,5 @@ Currently only IMB-MPI1 output can handle.
 
 # Author
 
-Atsushi Hori
-NII, Japan
+Atsushi Hori  
+NII, Japan  
