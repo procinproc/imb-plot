@@ -65,7 +65,9 @@ def ping( f, bench, np ):
     fig, ax0 = plt.subplots(1,1)
     ax0.set_xscale('log')
     ax0.set_yscale('log')
+    ax0.grid()
     ax1 = ax0.twinx()
+    ax1.grid( axis='y', linestyle='dotted' )
     ax1.set_yscale('log')
     ax0.plot( df['Latency'],   label='Latency',   color='Red'  )
     ax1.plot( df['Bandwidth'], label='Bandwidth', color='Blue' )
@@ -99,12 +101,19 @@ def exchange( f, bench, np ):
     df_lat.to_csv( bench+'-latency.csv',   sep=',' )
     df_bdw.to_csv( bench+'-bandwidth.csv', sep=',' )
 
-    df_lat.plot( title=bench+' (latency)',   loglog=True, grid=True, legend='reverse' )
+    ax = df_lat.plot( title=bench+' (latency)',
+                      loglog=True, grid=True, legend='reverse' )
+    ax.set_xlabel( 'Length (bytes)' )
+    ax.set_ylabel( 'Latency (usec)' )
     plt.savefig( bench+'-latency.pdf' )
     plt.close('all')
-    df_bdw.plot( title=bench+' (bandwidth)', loglog=True, grid=True, legend='reverse' )
+    ax = df_bdw.plot( title=bench+' (bandwidth)',
+                      loglog=True, grid=True, legend='reverse' )
+    ax.set_xlabel( 'Length (bytes)' )
+    ax.set_ylabel( 'Bandwidth (Mbytes/sec)' )
     plt.savefig( bench+'-bandwidth.pdf' )
     plt.close('all')
+
     return ( nb, np )
 
 def collective( f, bench, np ):
@@ -123,7 +132,10 @@ def collective( f, bench, np ):
 
     df.to_csv( bench+'.csv', sep=',' )
 
-    df.plot( title=bench, loglog=True, grid=True, legend='reverse' )
+    ax = df.plot( title=bench,
+                  loglog=True, grid=True, legend='reverse' )
+    ax.set_xlabel( 'Length (bytes)' )
+    ax.set_ylabel( 'Latency (usec)' )
     plt.savefig( bench+'.pdf' )
     plt.close('all')
 
@@ -144,31 +156,35 @@ def barrier( f, bench, np ):
 
     df.to_csv( bench+'.csv', sep=',' )
     
-    df.plot( title=bench, grid=True, marker='*', ylim=(0,None), legend=None )
+    ax = df.plot( title=bench,
+                  grid=True, marker='*', ylim=(0,None), legend=None )
+    ax.set_xscale( 'log' )
+    ax.set_xlabel( '# procs' )
+    ax.set_ylabel( 'Latency (usec)' )
     plt.savefig( bench+'.pdf' )
     plt.close('all')
 
     return ( nb, np )
 
-benchmarks = { 'PingPong': 	ping,
-               'PingPing': 	ping,
-               'Sendrecv': 	exchange,
-               'Exchange': 	exchange,
-               'Allreduce': 	collective,
-               'Reduce': 	collective,
-               'Reduce_local':	collective,
-               'Reduce_scatter': collective,
-               'Reduce_scatter_block': collective,
-               'Allgather':	collective,
-               'Allgatherv':	collective,
-               'Gather':	collective,
-               'Gatherv':	collective,
-               'Scatter':	collective,
-               'Scatterv':	collective,
-               'Alltoall':	collective,
-               'Alltoallv':	collective,
-               'Bcast':		collective,
-               'Barrier':	barrier }
+benchmarks = { 'PingPong': 		ping,
+               'PingPing': 		ping,
+               'Sendrecv': 		exchange,
+               'Exchange': 		exchange,
+               'Allreduce': 		collective,
+               'Reduce': 		collective,
+               'Reduce_local':		collective,
+               'Reduce_scatter': 	collective,
+               'Reduce_scatter_block': 	collective,
+               'Allgather':		collective,
+               'Allgatherv':		collective,
+               'Gather':		collective,
+               'Gatherv':		collective,
+               'Scatter':		collective,
+               'Scatterv':		collective,
+               'Alltoall':		collective,
+               'Alltoallv':		collective,
+               'Bcast':			collective,
+               'Barrier':		barrier }
 
 with open( imb_outfile, mode='r' ) as f:
     bench = get_benchmark( f )
@@ -176,6 +192,8 @@ with open( imb_outfile, mode='r' ) as f:
     while bench != None:
         if not bench in benchmarks:
             print( 'Unknown benchmark: ', bench )
+            bench = get_benchmark( f )
+            nproc = get_nprocs( f )
         else:
             ( bench, nproc ) = benchmarks[bench]( f, bench, nproc )
 
