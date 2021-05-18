@@ -6,11 +6,15 @@ import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 
-if len( sys.argv ) == 0:
+argc = len( sys.argv )
+if argc == 0:
     print( 'No input file' )
     sys.exit( 1 )
-
 imb_outfile = sys.argv[1]
+if argc > 2:
+    comment = ' ' + sys.argv[2]
+else:
+    comment = ''
 
 def my_readline( file ):
     byte_str = f.readline()
@@ -74,7 +78,7 @@ def ping( f, bench, np ):
     h0, l0 = ax0.get_legend_handles_labels()
     h1, l1 = ax1.get_legend_handles_labels()
     ax1.legend( h0+h1, l0+l1, loc='lower right' )
-    plt.title( bench )
+    plt.title( bench + comment )
     plt.savefig( bench+'.pdf' )
     plt.close('all')
 
@@ -101,13 +105,13 @@ def exchange( f, bench, np ):
     df_lat.to_csv( bench+'-latency.csv',   sep=',' )
     df_bdw.to_csv( bench+'-bandwidth.csv', sep=',' )
 
-    ax = df_lat.plot( title=bench+' (latency)',
+    ax = df_lat.plot( title=bench+' (latency)'+comment,
                       loglog=True, grid=True, legend='reverse' )
     ax.set_xlabel( 'Length (bytes)' )
     ax.set_ylabel( 'Latency (usec)' )
     plt.savefig( bench+'-latency.pdf' )
     plt.close('all')
-    ax = df_bdw.plot( title=bench+' (bandwidth)',
+    ax = df_bdw.plot( title=bench+' (bandwidth)'+comment,
                       loglog=True, grid=True, legend='reverse' )
     ax.set_xlabel( 'Length (bytes)' )
     ax.set_ylabel( 'Bandwidth (Mbytes/sec)' )
@@ -132,7 +136,7 @@ def collective( f, bench, np ):
 
     df.to_csv( bench+'.csv', sep=',' )
 
-    ax = df.plot( title=bench,
+    ax = df.plot( title=bench+comment,
                   loglog=True, grid=True, legend='reverse' )
     ax.set_xlabel( 'Length (bytes)' )
     ax.set_ylabel( 'Latency (usec)' )
@@ -156,7 +160,7 @@ def barrier( f, bench, np ):
 
     df.to_csv( bench+'.csv', sep=',' )
     
-    ax = df.plot( title=bench,
+    ax = df.plot( title=bench+comment,
                   grid=True, marker='*', ylim=(0,None), legend=None )
     ax.set_xscale( 'log' )
     ax.set_xlabel( '# procs' )
