@@ -12,7 +12,7 @@ benchmark results. This program will produce a graph in PDF of each
 benchmark. The title of each graph consists of benchmark name
 (PingPong, Alltoall, Barrier, ...) and optional comment.
 
-Additionally, CVS file corresponding to each PDF graph will allso be
+Additionally, CSV file corresponding to each PDF graph will allso be
 created so that users can create neat graphs easily.
 
 # Limitation
