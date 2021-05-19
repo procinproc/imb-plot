@@ -56,7 +56,6 @@ def get_nprocs( f ):
     return nprocs
 
 def ping( f, bench, np ):
-    print( bench )
     df = pd.DataFrame( [], columns=['Latency','Bandwidth'] )
     while( True ):
         tokens = my_readline( f )
@@ -88,7 +87,6 @@ def ping( f, bench, np ):
     return ( nb, np )
 
 def exchange( f, bench, np ):
-    print( bench )
     df_lat = pd.DataFrame( [], columns=[ np ] )
     df_bdw = pd.DataFrame( [], columns=[ np ] )
     while( True ):
@@ -104,16 +102,16 @@ def exchange( f, bench, np ):
             break
 
     df_lat.to_csv( fbase+bench+'-latency.csv',   sep=',' )
-    df_bdw.to_csv( fbase+bench+'-bandwidth.csv', sep=',' )
-
     ax = df_lat.plot( title=bench+' (latency)'+comment,
                       loglog=True, grid=True, legend='reverse' )
     ax.set_xlabel( 'Length (bytes)' )
     ax.set_ylabel( 'Latency (usec)' )
     plt.savefig( fbase+bench+'-latency.pdf' )
     plt.close('all')
+
+    df_bdw.to_csv( fbase+bench+'-bandwidth.csv', sep=',' )
     ax = df_bdw.plot( title=bench+' (bandwidth)'+comment,
-                      loglog=True, grid=True, legend='reverse' )
+                      loglog=True, grid=True )
     ax.set_xlabel( 'Length (bytes)' )
     ax.set_ylabel( 'Bandwidth (Mbytes/sec)' )
     plt.savefig( fbase+bench+'-bandwidth.pdf' )
@@ -122,7 +120,6 @@ def exchange( f, bench, np ):
     return ( nb, np )
 
 def collective( f, bench, np ):
-    print( bench )
     df = pd.DataFrame( [], columns=[ np ] )
     while( True ):
         while( True ):
@@ -147,7 +144,6 @@ def collective( f, bench, np ):
     return ( nb, np )
 
 def barrier( f, bench, np ):
-    print( bench )
     df = pd.DataFrame( [], columns=[ 'Latency' ] )
     while( True ):
         tokens = my_readline( f )
@@ -200,6 +196,7 @@ with open( imb_outfile, mode='r' ) as f:
             bench = get_benchmark( f )
             nproc = get_nprocs( f )
         else:
+            print( bench )
             ( bench, nproc ) = benchmarks[bench]( f, bench, nproc )
 
 sys.exit( 0 )
