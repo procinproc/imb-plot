@@ -18,7 +18,7 @@ else:
     comment = ''
 
 def my_readline( file ):
-    byte_str = f.readline()
+    byte_str = file.readline()
     if len( byte_str ) == 0:
         return None
     try:
