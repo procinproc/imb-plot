@@ -17,8 +17,8 @@ if argc > 2:
 else:
     comment = ''
 
-def my_readline( file ):
-    byte_str = file.readline()
+def my_readline( f ):
+    byte_str = f.readline()
     if len( byte_str ) == 0:
         return None
     try:
@@ -38,22 +38,31 @@ def get_benchmark( f ):
         tokens = my_readline( f )
         if tokens is None:
             return None
-        if len( tokens ) != 3:
+        nc = len( tokens )
+        if nc > 3:
+            if tokens[1] == 'BAD' and tokens[2] == 'TERMINATION':
+                print( 'BAD TERMINATION' )
+                sys.exit( 1 )
+            continue
+        if nc != 3:
             continue
         if tokens[1] == 'Benchmarking':
-            return tokens[2]
+            bench = tokens[2]
+            break
 
-def get_nprocs( f ):
     tokens = my_readline( f )
     if tokens is None:
         return None
     nprocs = int( tokens[3] )
+    # skip '#-----'
     while( True ):
         tokens = my_readline( f )
+        if tokens is None:
+            return None
         if len( tokens ) == 1 and tokens[0][0] == '#' and tokens[0][1] == '-':
             my_readline( f )    # skip header
             break
-    return nprocs
+    return ( bench, nprocs )
 
 def ping( f, bench, np ):
     df = pd.DataFrame( [], columns=['Latency','Bandwidth'] )
@@ -75,16 +84,14 @@ def ping( f, bench, np ):
     ax1.set_yscale('log')
     ax0.plot( df['Latency'],   label='Latency',   color='Red'  )
     ax1.plot( df['Bandwidth'], label='Bandwidth', color='Blue' )
-    h0, l0 = ax0.get_legend_handles_labels()
-    h1, l1 = ax1.get_legend_handles_labels()
-    ax1.legend( h0+h1, l0+l1, loc='lower right' )
+    ( h0, l0 ) = ax0.get_legend_handles_labels()
+    ( h1, l1 ) = ax1.get_legend_handles_labels()
+    ax1.legend( h0+h1, l0+l1, loc='upper left' )
     plt.title( bench + comment )
     plt.savefig( fbase+bench+'.pdf' )
-    plt.close('all')
+    plt.close( 'all' )
 
-    nb = get_benchmark( f )
-    np = get_nprocs( f )
-    return ( nb, np )
+    return get_benchmark( f )
 
 def exchange( f, bench, np ):
     df_lat = pd.DataFrame( [], columns=[ np ] )
@@ -96,9 +103,8 @@ def exchange( f, bench, np ):
                 break;
             df_lat.loc[ int(tokens[0]), np ] = float(tokens[4])
             df_bdw.loc[ int(tokens[0]), np ] = float(tokens[5])
-        nb = get_benchmark( f )
-        np = get_nprocs( f )
-        if nb != bench:
+        rv = get_benchmark( f )
+        if rv is None or rv[0] != bench:
             break
 
     df_lat.to_csv( fbase+bench+'-latency.csv',   sep=',' )
@@ -107,7 +113,7 @@ def exchange( f, bench, np ):
     ax.set_xlabel( 'Length (bytes)' )
     ax.set_ylabel( 'Latency (usec)' )
     plt.savefig( fbase+bench+'-latency.pdf' )
-    plt.close('all')
+    plt.close( 'all' )
 
     df_bdw.to_csv( fbase+bench+'-bandwidth.csv', sep=',' )
     ax = df_bdw.plot( title=bench+' (bandwidth)'+comment,
@@ -115,9 +121,9 @@ def exchange( f, bench, np ):
     ax.set_xlabel( 'Length (bytes)' )
     ax.set_ylabel( 'Bandwidth (Mbytes/sec)' )
     plt.savefig( fbase+bench+'-bandwidth.pdf' )
-    plt.close('all')
+    plt.close( 'all' )
 
-    return ( nb, np )
+    return rv
 
 def collective( f, bench, np ):
     df = pd.DataFrame( [], columns=[ np ] )
@@ -127,9 +133,8 @@ def collective( f, bench, np ):
             if tokens == [] or tokens is None:
                 break;
             df.loc[ int(tokens[0]), np ] = float(tokens[4])
-        nb = get_benchmark( f )
-        np = get_nprocs( f )
-        if nb != bench:
+        rv = get_benchmark( f )
+        if rv is None or rv[0] != bench:
             break
 
     df.to_csv( fbase+bench+'.csv', sep=',' )
@@ -139,9 +144,9 @@ def collective( f, bench, np ):
     ax.set_xlabel( 'Length (bytes)' )
     ax.set_ylabel( 'Latency (usec)' )
     plt.savefig( fbase+bench+'.pdf' )
-    plt.close('all')
+    plt.close( 'all' )
 
-    return ( nb, np )
+    return rv
 
 def barrier( f, bench, np ):
     df = pd.DataFrame( [], columns=[ 'Latency' ] )
@@ -150,9 +155,8 @@ def barrier( f, bench, np ):
         if tokens == [] or tokens is None:
             break;
         df.loc[ np ] = float(tokens[3])
-        nb = get_benchmark( f )
-        np = get_nprocs( f )
-        if nb != bench:
+        rv = get_benchmark( f )
+        if rv is None or rv[0] != bench:
             break
 
     df.to_csv( fbase+bench+'.csv', sep=',' )
@@ -163,9 +167,9 @@ def barrier( f, bench, np ):
     ax.set_xlabel( '# procs' )
     ax.set_ylabel( 'Latency (usec)' )
     plt.savefig( fbase+bench+'.pdf' )
-    plt.close('all')
+    plt.close( 'all' )
 
-    return ( nb, np )
+    return rv
 
 benchmarks = { 'PingPong': 		ping,
                'PingPing': 		ping,
@@ -188,15 +192,14 @@ benchmarks = { 'PingPong': 		ping,
                'Barrier':		barrier }
 
 with open( imb_outfile, mode='r' ) as f:
-    bench = get_benchmark( f )
-    nproc = get_nprocs( f )
-    while bench != None:
+    rv = get_benchmark( f )
+    while rv != None:
+        ( bench, nproc ) = rv
         if not bench in benchmarks:
             print( 'Unknown benchmark: ', bench )
-            bench = get_benchmark( f )
-            nproc = get_nprocs( f )
+            ( bench, nproc ) = get_benchmark( f )
         else:
             print( bench )
-            ( bench, nproc ) = benchmarks[bench]( f, bench, nproc )
+            rv = benchmarks[bench]( f, bench, nproc )
 
 sys.exit( 0 )
