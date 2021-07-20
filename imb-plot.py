@@ -6,17 +6,6 @@ import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 
-argc = len( sys.argv )
-if argc == 0:
-    print( 'No input file' )
-    sys.exit( 1 )
-imb_outfile = sys.argv[1]
-fbase = os.path.splitext( os.path.basename( imb_outfile ) )[0] + '-'
-if argc > 2:
-    comment = ' ' + sys.argv[2]
-else:
-    comment = ''
-
 def my_readline( f ):
     byte_str = f.readline()
     if len( byte_str ) == 0:
@@ -28,10 +17,11 @@ def my_readline( f ):
             ch_str = byte_str
     except:                     # python3
         ch_str = byte_str.decode()
+
     if len( ch_str ) > 0:
         ch_str = ch_str[0:-1]   # remove newline
-    tokens = ch_str.split()
-    return tokens
+        tokens = ch_str.split()
+        return tokens
 
 def get_benchmark( f ):
     while( True ):
@@ -43,7 +33,6 @@ def get_benchmark( f ):
             if tokens[1] == 'BAD' and tokens[2] == 'TERMINATION':
                 print( 'BAD TERMINATION' )
                 sys.exit( 1 )
-            continue
         if nc != 3:
             continue
         if tokens[1] == 'Benchmarking':
@@ -61,8 +50,7 @@ def get_benchmark( f ):
             return None
         if len( tokens ) == 1 and tokens[0][0] == '#' and tokens[0][1] == '-':
             my_readline( f )    # skip header
-            break
-    return ( bench, nprocs )
+            return ( bench, nprocs )
 
 def ping( f, bench, np ):
     df = pd.DataFrame( [], columns=['Latency','Bandwidth'] )
@@ -97,12 +85,11 @@ def exchange( f, bench, np ):
     df_lat = pd.DataFrame( [], columns=[ np ] )
     df_bdw = pd.DataFrame( [], columns=[ np ] )
     while( True ):
-        while( True ):
-            tokens = my_readline( f )
-            if tokens == [] or tokens is None:
-                break;
-            df_lat.loc[ int(tokens[0]), np ] = float(tokens[4])
-            df_bdw.loc[ int(tokens[0]), np ] = float(tokens[5])
+        tokens = my_readline( f )
+        if tokens == [] or tokens is None:
+            break;
+        df_lat.loc[ int(tokens[0]), np ] = float(tokens[4])
+        df_bdw.loc[ int(tokens[0]), np ] = float(tokens[5])
         rv = get_benchmark( f )
         if rv is None or rv[0] != bench:
             break
@@ -128,11 +115,10 @@ def exchange( f, bench, np ):
 def collective( f, bench, np ):
     df = pd.DataFrame( [], columns=[ np ] )
     while( True ):
-        while( True ):
-            tokens = my_readline( f )
-            if tokens == [] or tokens is None:
-                break;
-            df.loc[ int(tokens[0]), np ] = float(tokens[4])
+        tokens = my_readline( f )
+        if tokens == [] or tokens is None:
+            break;
+        df.loc[ int(tokens[0]), np ] = float(tokens[4])
         rv = get_benchmark( f )
         if rv is None or rv[0] != bench:
             break
@@ -191,15 +177,28 @@ benchmarks = { 'PingPong': 		ping,
                'Bcast':			collective,
                'Barrier':		barrier }
 
-with open( imb_outfile, mode='r' ) as f:
-    rv = get_benchmark( f )
-    while rv != None:
-        ( bench, nproc ) = rv
-        if not bench in benchmarks:
-            print( 'Unknown benchmark: ', bench )
-            ( bench, nproc ) = get_benchmark( f )
-        else:
-            print( bench )
-            rv = benchmarks[bench]( f, bench, nproc )
+argc = len( sys.argv )
+if argc == 0:
+    print( 'No input file' )
+    sys.exit( 1 )
+
+for i in range( 1, argc ):
+    imb_outfile = sys.argv[i]
+    fbase = os.path.splitext( os.path.basename( imb_outfile ) )[0] + '-'
+    if argc > 2:
+        comment = ' ' + sys.argv[2]
+    else:
+        comment = ''
+
+    with open( imb_outfile, mode='r' ) as f:
+        rv = get_benchmark( f )
+        while rv != None:
+            ( bench, nproc ) = rv
+            if not bench in benchmarks:
+                print( 'Unknown benchmark: ', bench )
+                ( bench, nproc ) = get_benchmark( f )
+            else:
+                print( bench )
+                rv = benchmarks[bench]( f, bench, nproc )
 
 sys.exit( 0 )
