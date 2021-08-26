@@ -4,7 +4,10 @@
 import os
 import sys
 import pandas as pd
+import math
 import matplotlib.pyplot as plt
+
+bench_dict = {}
 
 def my_readline( f ):
     byte_str = f.readline()
@@ -60,18 +63,53 @@ def get_benchmark( f ):
             break
     return ( bench, nprocs )
 
-def ping( f, bench, np ):
-    df = pd.DataFrame( [], columns=['Latency','Bandwidth'] )
-    while( True ):
-        tokens = my_readline( f )
-        if tokens == [] or tokens is None:
-            break;
+def ping( bench, np ):
+    clm = 0
+    try:
+        np_dict = bench_dict[bench]
         try:
-            df.loc[ int(tokens[0]) ] = [ float(tokens[2]), float(tokens[3]) ]
+            ( clm, df_lat, df_bdw ) = np_dict[np]
         except:
+            df_lat = pd.DataFrame( [], dtype=float )
+            df_bdw = pd.DataFrame( [], dtype=float )
+    except:
+        df_lat = pd.DataFrame( [], dtype=float )
+        df_bdw = pd.DataFrame( [], dtype=float )
+        clm = 0
+        bench_dict.setdefault( bench, { 2: ( clm, df_lat, df_bdw ) } )
+        np_dict = bench_dict[bench]
+
+    while True:
+        while True:
+            tokens = my_readline( f )
+            if tokens == [] or tokens is None:
+                break
+            try:
+                if int(tokens[0]) == 0:
+                    continue
+                df_lat.at[ int(tokens[0]), clm ] = float(tokens[2])
+                df_bdw.at[ int(tokens[0]), clm ] = float(tokens[3])
+            except:
+                break
+        clm += 1
+        rv = get_benchmark( f )
+        if rv is None:
+            break
+        ( b, p ) = rv
+        if b != bench or p != np:
             break
 
-    df.to_csv( fbase+bench+'.csv', sep=',' )
+    np_dict[np] = ( clm, df_lat, df_bdw )
+    return rv
+
+def ping_aft( f, bench, np_dict ):
+    ( clm, df_lat, df_bdw ) = np_dict[2]
+
+    df_lat.to_csv( fbase+bench+'-latency.csv',   sep=',' )
+    df_bdw.to_csv( fbase+bench+'-bandwidth.csv', sep=',' )
+
+    df_lat_mean = df_lat.mean( axis='columns' )
+    df_bdw_mean = df_bdw.mean( axis='columns' )
 
     plt.loglog()
     fig, ax0 = plt.subplots(1,1)
@@ -85,8 +123,8 @@ def ping( f, bench, np ):
     ax1.set_yscale('log')
     ax1.set_ylabel( 'Bandwidth' )
 
-    ax0.plot( df['Latency'],   label='Latency',   color='Red'  )
-    ax1.plot( df['Bandwidth'], label='Bandwidth', color='Blue' )
+    ax0.plot( df_lat_mean, label='Latency',   color='Red'  )
+    ax1.plot( df_bdw_mean, label='Bandwidth', color='Blue' )
     ( h0, l0 ) = ax0.get_legend_handles_labels()
     ( h1, l1 ) = ax1.get_legend_handles_labels()
     ax1.legend( h0+h1, l0+l1, loc='upper left' )
@@ -94,129 +132,191 @@ def ping( f, bench, np ):
     plt.savefig( fbase+bench+'.pdf' )
     plt.close( 'all' )
 
-    return get_benchmark( f )
 
-def exchange( f, bench, np ):
-    df_lat = pd.DataFrame( [], columns=[ np ] )
-    df_bdw = pd.DataFrame( [], columns=[ np ] )
-    while( True ):
-        while( True ):
+def exchange( bench, np ):
+    clm = 0
+    try:
+        np_dict = bench_dict[bench]
+        try:
+            ( clm, df_lat, df_bdw ) = np_dict[np]
+        except:
+            df_lat = pd.DataFrame( [], dtype=float )
+            df_bdw = pd.DataFrame( [], dtype=float )
+    except:
+        df_lat = pd.DataFrame( [], dtype=float )
+        df_bdw = pd.DataFrame( [], dtype=float )
+        clm = 0
+        np_dict = { np: ( clm, df_lat, df_bdw ) }
+        bench_dict.setdefault( bench, np_dict )
+        
+    while True:
+        while True:
             tokens = my_readline( f )
             if tokens == [] or tokens is None:
                 break;
             try:
-                df_lat.loc[ int(tokens[0]), np ] = float(tokens[4])
-                df_bdw.loc[ int(tokens[0]), np ] = float(tokens[5])
+                df_lat.at[ int(tokens[0]), clm ] = float(tokens[4])
+                df_bdw.at[ int(tokens[0]), clm ] = float(tokens[5])
             except:
                 break
+        clm += 1
         rv = get_benchmark( f )
-        if rv is None or rv[0] != bench:
+        if rv is None:
             break
-        np = rv[1]
+        ( b, p ) = rv
+        if b != bench or p != np:
+            break
 
-    df_lat.to_csv( fbase+bench+'-latency.csv',   sep=',' )
-    ax = df_lat.plot( title=bench+' (latency)',
-                      loglog=True, grid=True, legend='reverse' )
+    np_dict[np] = ( clm, df_lat, df_bdw )
+    return rv
+
+def exchange_aft( f, bench, np_dict ):
+    df_lat_mean = pd.DataFrame( [], dtype=float )
+    df_bdw_mean = pd.DataFrame( [], dtype=float )
+    for np in sorted( np_dict.keys() ):
+        ( clm, df_lat, df_bdw ) = np_dict[np]
+        df_lat.to_csv( fbase+bench+'-latency-'+str(np)+'.csv',
+                       sep=',' )
+        df_bdw.to_csv( fbase+bench+'-bandwidth-'+str(np)+'.csv',
+                       sep=',' )
+        df_lat_mean[np] = df_lat.mean( axis='columns' )
+        df_bdw_mean[np] = df_bdw.mean( axis='columns' )
+
+    ax = df_lat_mean.plot( title=bench+' (latency)',
+                           loglog=True, grid=True, legend='reverse' )
     ax.set_xlabel( 'Length (bytes)' )
     ax.set_ylabel( 'Latency (usec)' )
     plt.savefig( fbase+bench+'-latency.pdf' )
     plt.close( 'all' )
 
-    df_bdw.to_csv( fbase+bench+'-bandwidth.csv', sep=',' )
-    ax = df_bdw.plot( title=bench+' (bandwidth)',
-                      loglog=True, grid=True )
+    ax = df_bdw_mean.plot( title=bench+' (bandwidth)',
+                           loglog=True, grid=True )
     ax.set_xlabel( 'Message Size [Bytes]' )
     ax.set_ylabel( 'Bandwidth (Mbytes/sec)' )
     plt.savefig( fbase+bench+'-bandwidth.pdf' )
     plt.close( 'all' )
 
-    return rv
+def collective( bench, np ):
+    clm = 0
+    try:
+        np_dict = bench_dict[bench]
+        try:
+            ( clm, df_lat, df_bdw ) = np_dict[np]
+        except:
+            df = pd.DataFrame( [], dtype=float )
+            np_dict.setdefault( np, ( clm, df ) )
+    except:
+        df = pd.DataFrame( [], dtype=float )
+        np_dict = { np: ( clm, df) }
+        bench_dict.setdefault( bench, np_dict )
 
-def collective( f, bench, np ):
-    df = pd.DataFrame( [], columns=[ np ] )
-    while( True ):
-        while( True ):
+    while True:
+        while True:
             tokens = my_readline( f )
             if tokens == [] or tokens is None:
                 break;
             try:
-                df.loc[ int(tokens[0]), np ] = float(tokens[4])
+                df.at[ int(tokens[0]), clm ] = float(tokens[4])
             except:
                 break
+        clm += 1
         rv = get_benchmark( f )
-        if rv is None or rv[0] != bench:
+        if rv is None:
             break
-        np = rv[1]
+        ( b, p ) = rv
+        if b != bench or p != np:
+            break
 
-    df.to_csv( fbase+bench+'.csv', sep=',' )
+    np_dict[np] = ( clm, df )
+    return rv
 
-    ax = df.plot( title=bench,
-                  loglog=True, grid=True, legend='reverse' )
+def coll_aft( f, bench, np_dict ):
+    df_mean = pd.DataFrame( [], dtype=float )
+    for np in sorted( np_dict.keys() ):
+        ( clm, df ) = np_dict[np]
+        df.to_csv( fbase+bench+'-'+str(np)+'.csv', sep=',' )
+        df_mean[np] = df.mean( axis='columns' )
+
+    ax = df_mean.plot( title=bench,
+                       loglog=True, grid=True, legend='reverse' )
     ax.set_xlabel( 'Message Size [Bytes]' )
     ax.set_ylabel( 'Latency (usec)' )
     plt.savefig( fbase+bench+'.pdf' )
     plt.close( 'all' )
 
-    return rv
+def barrier( bench, np ):
+    clm = 0
+    try:
+        ( clm, df ) = bench_dict[bench]
+    except:
+        df = pd.DataFrame( [], dtype=float )
+        bench_dict.setdefault( bench, ( clm, df ) )
 
-def barrier( f, bench, np ):
-    df = pd.DataFrame( [], columns=[ 'Latency' ] )
-    while( True ):
-        while( True ):
+    while True:
+        while True:
             tokens = my_readline( f )
             if tokens == [] or tokens is None:
                 break;
             try:
-                df.loc[ np ] = float(tokens[3])
+                df.at[ np, clm ] = float(tokens[3])
             except:
                 break
+        clm += 1
         rv = get_benchmark( f )
-        if rv is None or rv[0] != bench:
+        if rv is None:
             break
-        np = rv[1]
+        ( b, p ) = rv
+        if b != bench or p != np:
+            break
 
+    bench_dict[bench] = ( clm, df )
+    return rv
+
+def barrier_aft( f, bench, bar ):
+    ( clm, df ) = bar
     df.to_csv( fbase+bench+'.csv', sep=',' )
-    
-    ax = df.plot( title=bench,
-                  grid=True, marker='*', ylim=(0,None), legend=None )
+    df_mean = df.mean( axis='columns' )
+
+    print( df_mean )
+    ax = df_mean.plot( title=bench, grid=True, marker='*',
+                       ylim=(0,None), legend=None )
     ax.set_xscale( 'log' )
     ax.set_xlabel( '# Procs' )
     ax.set_ylabel( 'Latency [usec]' )
     plt.savefig( fbase+bench+'.pdf' )
     plt.close( 'all' )
 
-    return rv
 
 benchmarks = {
     # MPI1
-    'PingPong': 		ping,
-    'PingPing': 		ping,
-    'Sendrecv': 		exchange,
-    'Exchange': 		exchange,
-    'Allreduce': 		collective,
-    'Reduce': 			collective,
-    'Reduce_local':		collective,
-    'Reduce_scatter': 		collective,
-    'Reduce_scatter_block': 	collective,
-    'Allgather':		collective,
-    'Allgatherv':		collective,
-    'Gather':			collective,
-    'Gatherv':			collective,
-    'Scatter':			collective,
-    'Scatterv':			collective,
-    'Alltoall':			collective,
-    'Alltoallv':		collective,
-    'Bcast':			collective,
-    'Barrier':			barrier,
+    'PingPong': 		( ping,		ping_aft ),
+    'PingPing': 		( ping,		ping_aft ),
+    'Sendrecv': 		( exchange,	exchange_aft ),
+    'Exchange': 		( exchange,	exchange_aft ),
+    'Allreduce': 		( collective,	coll_aft ),
+    'Reduce': 			( collective,	coll_aft ),
+    'Reduce_local':		( collective,	coll_aft ),
+    'Reduce_scatter': 		( collective,	coll_aft ),
+    'Reduce_scatter_block': 	( collective,	coll_aft ),
+    'Allgather':		( collective,	coll_aft ),
+    'Allgatherv':		( collective,	coll_aft ),
+    'Gather':			( collective,	coll_aft ),
+    'Gatherv':			( collective,	coll_aft ),
+    'Scatter':			( collective,	coll_aft ),
+    'Scatterv':			( collective,	coll_aft ),
+    'Alltoall':			( collective,	coll_aft ),
+    'Alltoallv':		( collective,	coll_aft ),
+    'Bcast':			( collective,	coll_aft ),
+    'Barrier':			( barrier,	barrier_aft ),
     # RMA
-    'Put_all_local':		ping,
-    'One_put_all':		ping,
-    'All_put_all':		collective,
-    'One_get_all':		ping,
-    'All_get_all':		collective,
-    'Exchange_put':		collective,
-    'Exchange_get':		collective,
-    'Accumulate':		ping
+    'Put_all_local':		( ping,		ping_aft ),
+    'One_put_all':		( ping,		ping_aft ),
+    'All_put_all':		( collective,	coll_aft ),
+    'One_get_all':		( ping,		ping_aft ),
+    'All_get_all':		( collective,	coll_aft ),
+    'Exchange_put':		( collective,	coll_aft ),
+    'Exchange_get':		( collective,	coll_aft ),
+    'Accumulate':		( ping,		ping_aft )
 }
 
 argc = len( sys.argv )
@@ -233,7 +333,13 @@ for i in range( 1, argc ):
         rv = get_benchmark( f )
         while rv != None:
             ( bench, nproc ) = rv
-            print( '   ', bench )
-            rv = benchmarks[bench]( f, bench, nproc )
+            print( '   Parsing:', bench, '[', nproc, ']' )
+            ( func0, func1 ) = benchmarks[bench]
+            rv = func0( bench, nproc )
+
+for key in bench_dict.keys():
+    ( func0, func1 ) = benchmarks[key]
+    print( '   Drawing:', key )
+    func1( f, key, bench_dict[key] )
 
 sys.exit( 0 )
